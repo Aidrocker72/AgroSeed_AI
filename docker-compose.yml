@@ -1,0 +1,105 @@
+version: "3.8"
+
+services:
+  # База данных
+  postgres:
+    image: postgres:15
+    container_name: agroseed_postgres
+    environment:
+      POSTGRES_DB: agroseed
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - agroseed_network
+
+  # Backend API сервис
+  backend-api:
+    build:
+      context: ./backend-api
+      dockerfile: Dockerfile
+    container_name: agroseed_backend_api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user:password@postgres:5432/agroseed
+      SECRET_KEY: ${SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      ETL_SERVICE_URL: http://etl-service:8000
+      AI_SERVICE_URL: http://ai-service:8000
+    depends_on:
+      - postgres
+    networks:
+      - agroseed_network
+
+  # ETL сервис
+  etl-service:
+    build:
+      context: ./etl-service
+      dockerfile: Dockerfile
+    container_name: agroseed_etl_service
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user:password@postgres:5432/agroseed_etl
+      SCHEDULER_ENABLED: "true"
+    depends_on:
+      - postgres
+    networks:
+      - agroseed_network
+
+  # AI сервис
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: agroseed_ai_service
+    ports:
+      - "8002:8000"
+    environment:
+      MODEL_STORAGE_PATH: ./models
+    networks:
+      - agroseed_network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: agroseed_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      API_BASE_URL: http://localhost:8000/api/v1
+    depends_on:
+      - backend-api
+    networks:
+      - agroseed_network
+
+  # Adminer для просмотра базы данных
+  adminer:
+    image: adminer
+    container_name: agroseed_adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_DB_DRIVER: pgsql
+      ADMINER_DEFAULT_DB_HOST: postgres
+      ADMINER_DEFAULT_DB_NAME: agroseed
+      ADMINER_DEFAULT_DB_USER: user
+      ADMINER_DEFAULT_DB_PASSWORD: password
+    depends_on:
+      - postgres
+    networks:
+      - agroseed_network
+
+volumes:
+  postgres_data:
+
+networks:
+  agroseed_network:
+    driver: bridge
