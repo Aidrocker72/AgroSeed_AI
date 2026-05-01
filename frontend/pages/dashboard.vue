@@ -1,23 +1,48 @@
 <template>
   <div class="dashboard">
     <h1>Панель управления</h1>
-    
+
     <div class="dashboard-content">
       <div class="card">
         <h2>Создать новый прогноз</h2>
         <form @submit.prevent="createForecast">
           <div class="form-group">
-            <label for="territory">Выберите территорию:</label>
+            <label for="territory">Регион:</label>
             <select v-model="selectedTerritory" id="territory" required>
-              <option value="">Выберите территорию</option>
-              <option v-for="territory in territories" :key="territory.id" :value="territory.id">
-                {{ territory.name }}
+              <option value="">Выберите регион</option>
+              <option v-for="t in territories" :key="t.id" :value="t.id">
+                {{ t.name }}
               </option>
             </select>
           </div>
-          <button type="submit" :disabled="loading" class="btn btn-primary">
+
+          <div class="form-group">
+            <label for="crop">Культура:</label>
+            <select v-model="selectedCrop" id="crop" required>
+              <option v-for="c in crops" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Период прогноза:</label>
+            <div class="period-buttons">
+              <button
+                v-for="p in periods"
+                :key="p.value"
+                type="button"
+                class="period-btn"
+                :class="{ active: selectedPeriod === p.value }"
+                @click="selectedPeriod = p.value"
+              >
+                {{ p.label }}
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" :disabled="loading || !selectedTerritory" class="btn btn-primary">
             {{ loading ? 'Создание...' : 'Создать прогноз' }}
           </button>
+          <div v-if="error" class="error-message">{{ error }}</div>
         </form>
       </div>
 
@@ -30,10 +55,14 @@
           <div v-for="forecast in forecasts" :key="forecast.id" class="forecast-item">
             <div class="forecast-info">
               <h3>{{ getTerritoryName(forecast.territory_id) }}</h3>
-              <p>Создан: {{ formatDate(forecast.created_at) }}</p>
+              <div class="forecast-tags">
+                <span class="tag tag-crop">{{ forecast.raw_data?.crop_name || '—' }}</span>
+                <span class="tag tag-period">{{ forecast.raw_data?.forecast_period || 30 }} дней</span>
+              </div>
+              <p class="forecast-date">{{ formatDate(forecast.created_at) }}</p>
             </div>
             <NuxtLink :to="`/forecast/${forecast.id}`" class="btn btn-secondary">
-              Посмотреть
+              Открыть
             </NuxtLink>
           </div>
         </div>
@@ -50,7 +79,17 @@ definePageMeta({
 const forecastStore = useForecastStore()
 const { forecasts, territories, loading } = storeToRefs(forecastStore)
 
+const crops = ['Пшеница', 'Кукуруза', 'Соя', 'Подсолнечник', 'Ячмень']
+const periods = [
+  { label: '7 дней', value: 7 },
+  { label: '14 дней', value: 14 },
+  { label: '30 дней', value: 30 },
+  { label: '90 дней', value: 90 },
+]
+
 const selectedTerritory = ref('')
+const selectedCrop = ref('Пшеница')
+const selectedPeriod = ref(30)
 
 onMounted(async () => {
   await forecastStore.fetchTerritories()
@@ -59,24 +98,26 @@ onMounted(async () => {
 
 const createForecast = async () => {
   if (!selectedTerritory.value) return
-
   try {
-    await forecastStore.createForecast(Number(selectedTerritory.value))
+    const forecast = await forecastStore.createForecast(
+      Number(selectedTerritory.value),
+      selectedCrop.value,
+      selectedPeriod.value
+    )
     selectedTerritory.value = ''
-    await forecastStore.fetchForecasts()
+    await navigateTo(`/forecast/${forecast.id}`)
   } catch (error) {
     console.error('Error creating forecast:', error)
   }
 }
 
 const getTerritoryName = (territoryId: number) => {
-  const territory = territories.value.find((t: { id: number; name: string }) => t.id === territoryId)
-  return territory ? territory.name : 'Неизвестная территория'
+  const t = territories.value.find((t: { id: number; name: string }) => t.id === territoryId)
+  return t ? t.name : 'Неизвестный регион'
 }
 
 const formatDate = (dateString: string) => {
-  const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' }
-  return new Date(dateString).toLocaleDateString('ru-RU', options)
+  return new Date(dateString).toLocaleDateString('ru-RU', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 </script>
 
@@ -97,8 +138,9 @@ const formatDate = (dateString: string) => {
 .card {
   background: white;
   padding: 1.5rem;
- border-radius: 8px;
+  border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  align-self: start;
 }
 
 .form-group {
@@ -107,16 +149,41 @@ const formatDate = (dateString: string) => {
 
 label {
   display: block;
-  margin-bottom: 0.5rem;
-  font-weight: bold;
+  margin-bottom: 0.4rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #444;
 }
 
 select {
   width: 100%;
   padding: 0.5rem;
- border: 1px solid #ddd;
+  border: 1px solid #ddd;
   border-radius: 4px;
   box-sizing: border-box;
+  font-size: 0.95rem;
+}
+
+.period-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.period-btn {
+  flex: 1;
+  padding: 0.4rem 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+
+.period-btn.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
 }
 
 .btn {
@@ -133,11 +200,14 @@ select {
 .btn-primary {
   background-color: #007bff;
   color: white;
+  width: 100%;
+  margin-top: 0.5rem;
 }
 
 .btn-secondary {
   background-color: #6c757d;
   color: white;
+  white-space: nowrap;
 }
 
 .btn:disabled {
@@ -148,30 +218,65 @@ select {
 .forecasts-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .forecast-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
+  padding: 0.85rem 1rem;
   border: 1px solid #eee;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .forecast-info h3 {
-  margin: 0 0.5rem 0;
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
 }
 
-.forecast-info p {
+.forecast-tags {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.3rem;
+}
+
+.tag {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.tag-crop {
+  background: #e8f4fd;
+  color: #0066cc;
+}
+
+.tag-period {
+  background: #f0faf0;
+  color: #2d862d;
+}
+
+.forecast-date {
   margin: 0;
-  color: #666;
+  color: #888;
+  font-size: 0.82rem;
 }
 
 .no-data {
   text-align: center;
-  color: #666;
+  color: #999;
   padding: 2rem;
+}
+
+.error-message {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  color: #856404;
+  font-size: 0.9rem;
 }
 </style>

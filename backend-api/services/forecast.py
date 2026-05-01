@@ -34,43 +34,47 @@ class ForecastService:
         )
 
     async def create_forecast(self, db: AsyncSession, forecast_data: ForecastCreate) -> Forecast:
-        forecast = Forecast(
-            user_id=forecast_data.user_id,
-            territory_id=forecast_data.territory_id,
-            raw_data=forecast_data.raw_data,
-            ai_result=forecast_data.ai_result
-        )
+        forecast = Forecast(**forecast_data.model_dump())
         return await self.forecast_repository.create(db, forecast)
 
     async def update_forecast(self, db: AsyncSession, forecast_id: int, forecast_data: ForecastUpdate) -> Optional[Forecast]:
-        update_data = forecast_data.dict(exclude_unset=True)
+        update_data = forecast_data.model_dump(exclude_unset=True)
         return await self.forecast_repository.update(db, forecast_id, update_data)
 
     async def delete_forecast(self, db: AsyncSession, forecast_id: int) -> bool:
         return await self.forecast_repository.delete(db, forecast_id)
 
-    async def run_ai_prediction(self, seed_data: Dict[str, Any], news_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Вызов AI сервиса для получения прогноза
-        """
+    async def get_seed_data(self, territory_id: int, crop_name: str = None) -> List[Dict[str, Any]]:
+        params = {"limit": 200}
+        if crop_name:
+            params["crop_name"] = crop_name
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{settings.ai_service_url}/predict",
-                json={
-                    "seed_data": seed_data,
-                    "news_data": news_data
-                },
-                timeout=30.0
+            response = await client.get(
+                f"{settings.etl_service_url}/etl/data/seeds/{territory_id}",
+                params=params,
+                timeout=30.0,
             )
             response.raise_for_status()
             return response.json()
 
-    async def run_etl_process(self, process_type: str) -> Dict[str, Any]:
-        """
-        Вызов ETL сервиса для обновления данных
-        """
+    async def get_news_data(self, territory_id: int) -> List[Dict[str, Any]]:
         async with httpx.AsyncClient() as client:
-            endpoint = f"{settings.etl_service_url}/etl/run/{process_type}"
-            response = await client.get(endpoint, timeout=30.0)
+            response = await client.get(
+                f"{settings.etl_service_url}/etl/data/news/{territory_id}",
+                params={"limit": 50},
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def run_ai_prediction(
+        self, seed_data: List[Dict[str, Any]], news_data: List[Dict[str, Any]], forecast_period: int = 30
+    ) -> Dict[str, Any]:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.ai_service_url}/predict/predict",
+                json={"seed_data": seed_data, "news_data": news_data, "forecast_period": forecast_period},
+                timeout=120.0,
+            )
             response.raise_for_status()
             return response.json()

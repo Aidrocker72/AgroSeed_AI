@@ -81,10 +81,10 @@ const handleRegister = async () => {
  error.value = ''
   
   try {
-    await authStore.register(email.value, password.value, name.value)
+    await authStore.register(email.value, password.value)
     await router.push('/login')
   } catch (err: any) {
-    error.value = err.message || 'Ошибка регистрации'
+    error.value = err.data?.detail || err.message || 'Ошибка регистрации'
   } finally {
     loading.value = false
   }

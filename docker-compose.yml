@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # База данных
   postgres:
@@ -16,6 +14,12 @@ services:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - agroseed_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d agroseed"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   # Backend API сервис
   backend-api:
@@ -28,11 +32,14 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://user:password@postgres:5432/agroseed
       SECRET_KEY: ${SECRET_KEY}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000"]}
       ETL_SERVICE_URL: http://etl-service:8000
       AI_SERVICE_URL: http://ai-service:8000
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      etl-service:
+        condition: service_healthy
     networks:
       - agroseed_network
 
@@ -48,9 +55,16 @@ services:
       DATABASE_URL: postgresql+asyncpg://user:password@postgres:5432/agroseed_etl
       SCHEDULER_ENABLED: "true"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - agroseed_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   # AI сервис
   ai-service:
@@ -93,7 +107,8 @@ services:
       ADMINER_DEFAULT_DB_USER: user
       ADMINER_DEFAULT_DB_PASSWORD: password
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - agroseed_network
 

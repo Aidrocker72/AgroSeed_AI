@@ -1,82 +1,93 @@
 import { defineStore } from 'pinia'
 
-export const useForecastStore = defineStore('forecast', {
-  state: () => ({
-    forecasts: [] as any[],
-    currentForecast: null as any,
-    territories: [] as any[],
-    loading: false,
-    error: null as string | null,
-  }),
+export const useForecastStore = defineStore('forecast', () => {
+  const forecasts = ref<any[]>([])
+  const currentForecast = ref<any>(null)
+  const territories = ref<any[]>([])
+  const loading = ref(false)
+  const error = ref<string | null>(null)
 
-  getters: {
-    getForecasts: (state) => state.forecasts,
-    getCurrentForecast: (state) => state.currentForecast,
-    getTerritories: (state) => state.territories,
-  },
-
-  actions: {
-    async fetchTerritories() {
-      this.loading = true
-      try {
-        const response = await $fetch('/territories')
-        this.territories = response
-        this.error = null
-      } catch (error) {
-        console.error('Error fetching territories:', error)
-        this.error = 'Ошибка загрузки территорий'
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async fetchForecasts() {
-      this.loading = true
-      try {
-        const response = await $fetch('/forecast/list')
-        this.forecasts = response
-        this.error = null
-      } catch (error) {
-        console.error('Error fetching forecasts:', error)
-        this.error = 'Ошибка загрузки прогнозов'
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async fetchForecastById(id: number) {
-      this.loading = true
-      try {
-        const response = await $fetch(`/forecast/${id}`)
-        this.currentForecast = response
-        this.error = null
-      } catch (error) {
-        console.error('Error fetching forecast:', error)
-        this.error = 'Ошибка загрузки прогноза'
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async createForecast(territoryId: number) {
-      this.loading = true
-      try {
-        const response = await $fetch('/forecast/run', {
-          method: 'POST',
-          body: { territory_id: territoryId }
-        })
-        // Добавляем новый прогноз в список
-        this.forecasts.unshift(response)
-        this.currentForecast = response
-        this.error = null
-        return response
-      } catch (error) {
-        console.error('Error creating forecast:', error)
-        this.error = 'Ошибка создания прогноза'
-        throw error
-      } finally {
-        this.loading = false
-      }
+  const fetchTerritories = async () => {
+    loading.value = true
+    try {
+      const api = useApi()
+      territories.value = await api('/territories')
+      error.value = null
+    } catch (e) {
+      error.value = 'Ошибка загрузки территорий'
+    } finally {
+      loading.value = false
     }
- }
+  }
+
+  const fetchForecasts = async () => {
+    loading.value = true
+    try {
+      const api = useApi()
+      forecasts.value = await api('/forecast/list')
+      error.value = null
+    } catch (e) {
+      error.value = 'Ошибка загрузки прогнозов'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const fetchForecastById = async (id: number) => {
+    loading.value = true
+    try {
+      const api = useApi()
+      currentForecast.value = await api(`/forecast/${id}`)
+      error.value = null
+    } catch (e) {
+      error.value = 'Ошибка загрузки прогноза'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const createForecast = async (territoryId: number, cropName: string, forecastPeriod: number) => {
+    loading.value = true
+    try {
+      const api = useApi()
+      const params = new URLSearchParams({
+        territory_id: String(territoryId),
+        crop_name: cropName,
+        forecast_period: String(forecastPeriod),
+      })
+      const response = await api(`/forecast/run?${params}`, { method: 'POST' })
+      forecasts.value.unshift(response)
+      currentForecast.value = response
+      error.value = null
+      return response
+    } catch (e: any) {
+      error.value = e.data?.detail || e.message || 'Ошибка создания прогноза'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const runForecastForCrop = async (territoryId: number, cropName: string, forecastPeriod: number) => {
+    const api = useApi()
+    const params = new URLSearchParams({
+      territory_id: String(territoryId),
+      crop_name: cropName,
+      forecast_period: String(forecastPeriod),
+    })
+    return await api(`/forecast/run?${params}`, { method: 'POST' })
+  }
+
+  return {
+    forecasts,
+    currentForecast,
+    territories,
+    loading,
+    error,
+    fetchTerritories,
+    fetchForecasts,
+    fetchForecastById,
+    createForecast,
+    runForecastForCrop,
+  }
 })

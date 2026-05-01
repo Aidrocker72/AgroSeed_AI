@@ -10,13 +10,17 @@ class SeedDataRepository(BaseRepository[SeedData]):
         super().__init__(SeedData)
 
     async def get_by_territory(
-        self, 
-        db: AsyncSession, 
-        territory_id: int, 
-        skip: int = 0, 
-        limit: int = 100
+        self,
+        db: AsyncSession,
+        territory_id: int,
+        skip: int = 0,
+        limit: int = 100,
+        crop_name: str = None,
     ) -> List[SeedData]:
-        stmt = select(SeedData).where(SeedData.territory_id == territory_id).offset(skip).limit(limit)
+        stmt = select(SeedData).where(SeedData.territory_id == territory_id)
+        if crop_name:
+            stmt = stmt.where(SeedData.name == crop_name)
+        stmt = stmt.order_by(SeedData.date).offset(skip).limit(limit)
         result = await db.execute(stmt)
         return result.scalars().all()
 

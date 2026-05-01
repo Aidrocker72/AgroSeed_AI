@@ -10,7 +10,7 @@ class ForecastBase(BaseModel):
 
 
 class ForecastCreate(ForecastBase):
-    pass
+    user_id: int
 
 
 class ForecastUpdate(BaseModel):

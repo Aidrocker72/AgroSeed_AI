@@ -1,260 +1,390 @@
 <template>
   <div class="forecast-detail">
-    <div v-if="loading" class="loading">
-      Загрузка...
-    </div>
+    <div v-if="loading" class="loading">Загрузка...</div>
+
     <div v-else-if="currentForecast" class="forecast-content">
       <div class="forecast-header">
-        <h1>Детали прогноза #{{ currentForecast.id }}</h1>
-        <p>Территория: {{ getTerritoryName(currentForecast.territory_id) }}</p>
-        <p>Дата создания: {{ formatDate(currentForecast.created_at) }}</p>
+        <NuxtLink to="/dashboard" class="back-link">← Назад</NuxtLink>
+        <h1>{{ getTerritoryName(currentForecast.territory_id) }}</h1>
+        <div class="header-tags">
+          <span class="tag tag-crop">{{ currentForecast.raw_data?.crop_name || 'Культура не указана' }}</span>
+          <span class="tag tag-period">{{ currentForecast.raw_data?.forecast_period || 30 }} дней</span>
+          <span class="tag tag-date">{{ formatDate(currentForecast.created_at) }}</span>
+        </div>
       </div>
 
-      <div class="forecast-chart">
-        <h2>График прогноза</h2>
-        <!-- Здесь будет отображаться график с использованием Chart.js -->
-        <LineChart 
-          v-if="chartData" 
-          :data="chartData" 
-          :options="chartOptions"
-          :height="400"
-        />
-      </div>
+      <div class="two-col">
+        <!-- График -->
+        <div class="card chart-card">
+          <h2>График прогноза цен</h2>
+          <div class="chart-wrap">
+            <LineChart
+              v-if="chartData"
+              :data="chartData"
+              :options="chartOptions"
+            />
+          </div>
+        </div>
 
-      <div class="forecast-details">
-        <h2>Детали прогноза</h2>
-        <div class="details-grid">
-          <div class="detail-card">
-            <h3>Период прогноза</h3>
-            <p>30 дней</p>
+        <!-- Сводка -->
+        <div class="sidebar">
+          <div class="card stat-card">
+            <div class="stat-label">Последняя цена</div>
+            <div class="stat-value">{{ formatPrice(currentForecast.ai_result?.model_info?.last_known_price) }}</div>
+            <div class="stat-sub">{{ currentForecast.ai_result?.model_info?.last_known_date }}</div>
           </div>
-          <div class="detail-card">
-            <h3>Метод прогнозирования</h3>
-            <p>Random Forest + Prophet</p>
+          <div class="card stat-card">
+            <div class="stat-label">Прогноз на {{ currentForecast.raw_data?.forecast_period || 30 }} дней</div>
+            <div class="stat-value">{{ formatPrice(lastForecastPrice) }}</div>
+            <div class="stat-sub" :class="trendClass">{{ trendLabel }}</div>
           </div>
-          <div class="detail-card">
-            <h3>Точность модели</h3>
-            <p>MAE: {{ currentForecast.ai_result.model_info.mae?.toFixed(2) || 'N/A' }}</p>
+          <div class="card stat-card">
+            <div class="stat-label">Модель</div>
+            <div class="stat-value model-name">{{ currentForecast.ai_result?.model_info?.model_type || 'RF + HW' }}</div>
           </div>
         </div>
       </div>
 
-      <div class="forecast-data">
-        <h2>Прогнозируемые данные</h2>
+      <!-- Таблица -->
+      <div class="card">
+        <div class="table-top">
+          <h2>Прогнозируемые данные</h2>
+          <button class="export-btn" @click="exportCsv">⬇ Скачать CSV</button>
+        </div>
         <div class="data-table">
           <div class="table-header">
-            <div class="col-date">Дата</div>
-            <div class="col-price">Прогнозируемая цена</div>
-            <div class="col-change">Изменение</div>
+            <div>Дата</div>
+            <div>Цена (₽)</div>
+            <div>Изменение</div>
           </div>
-          <div 
-            v-for="(item, index) in currentForecast.ai_result.forecast" 
-            :key="index" 
+          <div
+            v-for="(item, index) in currentForecast.ai_result.forecast"
+            :key="index"
             class="table-row"
           >
-            <div class="col-date">{{ formatDate(item.date) }}</div>
+            <div>{{ formatDate(item.date) }}</div>
             <div class="col-price">{{ formatPrice(item.predicted_price) }}</div>
-            <div class="col-change" :class="getChangeClass(item, index)">
-              {{ getChangeValue(item, index) }}
-            </div>
+            <div :class="getChangeClass(item, index)">{{ getChangeValue(item, index) }}</div>
           </div>
         </div>
       </div>
-    <div v-else class="error">
-      Прогноз не найден
     </div>
+
+    <div v-else class="error">Прогноз не найден</div>
   </div>
 </template>
 
 <script setup lang="ts">
-definePageMeta({
-  middleware: 'auth'
-})
+definePageMeta({ middleware: 'auth' })
 
 const route = useRoute()
 const forecastStore = useForecastStore()
-const { currentForecast, loading } = storeToRefs(forecastStore)
+const { currentForecast, loading, territories } = storeToRefs(forecastStore)
 
-// Получаем ID прогноза из параметров маршрута
 const forecastId = computed(() => parseInt(route.params.id as string))
 
-// Загружаем детали прогноза при монтировании компонента
 onMounted(async () => {
- await forecastStore.fetchForecastById(forecastId.value)
+  if (!territories.value.length) await forecastStore.fetchTerritories()
+  await forecastStore.fetchForecastById(forecastId.value)
 })
 
-// Обновляем данные при изменении ID прогноза
-watch(forecastId, async (newId) => {
-  if (newId) {
-    await forecastStore.fetchForecastById(newId)
-  }
+watch(forecastId, async (id: number) => {
+  if (id) await forecastStore.fetchForecastById(id)
 })
 
-// Подготовка данных для графика
 const chartData = computed(() => {
   if (!currentForecast.value) return null
-  
   const forecast = currentForecast.value.ai_result.forecast
+  const ci = currentForecast.value.ai_result.confidence_interval
   return {
-    labels: forecast.map(item => formatDate(item.date)),
+    labels: forecast.map((item: any) => item.date),
     datasets: [
       {
-        label: 'Прогнозируемая цена',
-        data: forecast.map(item => item.predicted_price),
+        label: 'Прогноз',
+        data: forecast.map((item: any) => item.predicted_price),
         borderColor: '#007bff',
-        backgroundColor: 'rgba(0, 123, 255, 0.1)',
-        tension: 0.4
-      }
-    ]
+        backgroundColor: 'rgba(0, 123, 255, 0.08)',
+        tension: 0.4,
+        fill: false,
+        pointRadius: 2,
+      },
+      ...(ci ? [{
+        label: 'Верхняя граница',
+        data: ci.upper_bound,
+        borderColor: 'rgba(0,123,255,0.25)',
+        backgroundColor: 'rgba(0,123,255,0.08)',
+        borderDash: [4, 4],
+        tension: 0.4,
+        fill: '+1',
+        pointRadius: 0,
+      }, {
+        label: 'Нижняя граница',
+        data: ci.lower_bound,
+        borderColor: 'rgba(0,123,255,0.25)',
+        backgroundColor: 'rgba(0,123,255,0.08)',
+        borderDash: [4, 4],
+        tension: 0.4,
+        fill: false,
+        pointRadius: 0,
+      }] : []),
+    ],
   }
 })
 
 const chartOptions = {
   responsive: true,
-  maintainAspectRatio: false,
-  scales: {
-    y: {
-      beginAtZero: false
-    }
- }
+  maintainAspectRatio: true,
+  plugins: { legend: { display: false } },
+  scales: { y: { beginAtZero: false } },
 }
 
-// Вспомогательные функции
-const getTerritoryName = (territoryId: number) => {
-  // В реальном приложении нужно получить название территории из хранилища
- return `Территория ${territoryId}`
+const lastForecastPrice = computed(() => {
+  const f = currentForecast.value?.ai_result?.forecast
+  return f?.length ? f[f.length - 1].predicted_price : null
+})
+
+const trendClass = computed(() => {
+  const last = lastForecastPrice.value
+  const first = currentForecast.value?.ai_result?.model_info?.last_known_price
+  if (!last || !first) return ''
+  return last >= first ? 'positive' : 'negative'
+})
+
+const trendLabel = computed(() => {
+  const last = lastForecastPrice.value
+  const first = currentForecast.value?.ai_result?.model_info?.last_known_price
+  if (!last || !first) return ''
+  const pct = ((last - first) / first) * 100
+  return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% за период`
+})
+
+const getTerritoryName = (id: number) => {
+  const t = territories.value.find((t: any) => t.id === id)
+  return t ? t.name : `Территория ${id}`
 }
 
-const formatDate = (dateString: string) => {
-  const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' }
-  return new Date(dateString).toLocaleDateString('ru-RU', options)
-}
+const formatDate = (d: string) =>
+  new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
 
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'RUB',
-    minimumFractionDigits: 0
-  }).format(price)
-}
+const formatPrice = (price: number) =>
+  price != null
+    ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(price)
+    : '—'
 
 const getChangeValue = (item: any, index: number) => {
   if (index === 0) return '—'
-  
-  const prevItem = currentForecast.value?.ai_result.forecast[index - 1]
-  if (!prevItem) return '—'
-  
-  const change = ((item.predicted_price - prevItem.predicted_price) / prevItem.predicted_price) * 100
-  return `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`
+  const prev = currentForecast.value?.ai_result.forecast[index - 1]
+  if (!prev) return '—'
+  const pct = ((item.predicted_price - prev.predicted_price) / prev.predicted_price) * 100
+  return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`
 }
 
 const getChangeClass = (item: any, index: number) => {
   if (index === 0) return ''
-  
-  const prevItem = currentForecast.value?.ai_result.forecast[index - 1]
-  if (!prevItem) return ''
-  
-  const change = item.predicted_price - prevItem.predicted_price
-  return change >= 0 ? 'positive' : 'negative'
+  const prev = currentForecast.value?.ai_result.forecast[index - 1]
+  if (!prev) return ''
+  return item.predicted_price >= prev.predicted_price ? 'positive' : 'negative'
+}
+
+const exportCsv = () => {
+  const f = currentForecast.value
+  if (!f) return
+
+  const forecast = f.ai_result.forecast
+  const ci = f.ai_result.confidence_interval
+  const territory = getTerritoryName(f.territory_id)
+  const crop = f.raw_data?.crop_name || ''
+  const period = f.raw_data?.forecast_period || 30
+
+  const header = ['Дата', 'Прогноз (₽)', 'Нижняя граница (₽)', 'Верхняя граница (₽)', 'Изменение (%)']
+  const rows = forecast.map((item: any, i: number) => {
+    const prev = forecast[i - 1]
+    const pct = prev ? (((item.predicted_price - prev.predicted_price) / prev.predicted_price) * 100).toFixed(2) : ''
+    const lower = ci?.lower_bound?.[i] ?? ''
+    const upper = ci?.upper_bound?.[i] ?? ''
+    return [item.date, item.predicted_price, lower, upper, pct]
+  })
+
+  const csv = [header, ...rows].map(r => r.join(';')).join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `agroseed_${territory}_${crop}_${period}d.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 </script>
 
 <style scoped>
 .forecast-detail {
-  padding: 2rem;
+  padding: 1.5rem 2rem;
   max-width: 1200px;
   margin: 0 auto;
 }
 
 .loading, .error {
   text-align: center;
-  padding: 2rem;
-  font-size: 1.2rem;
-}
-
-.forecast-header {
-  margin-bottom: 2rem;
-}
-
-.forecast-header h1 {
-  margin-bottom: 0.5rem;
-}
-
-.forecast-chart {
-  margin: 2rem 0;
-  padding: 1rem;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-}
-
-.forecast-details {
-  margin: 2rem 0;
-}
-
-.details-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.detail-card {
-  background: white;
-  padding: 1rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  text-align: center;
-}
-
-.detail-card h3 {
-  margin-top: 0;
+  padding: 3rem;
+  font-size: 1.1rem;
   color: #666;
 }
 
-.forecast-data {
-  margin: 2rem 0;
+.back-link {
+  display: inline-block;
+  color: #007bff;
+  text-decoration: none;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.forecast-header {
+  margin-bottom: 1.5rem;
+}
+
+.forecast-header h1 {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 1.6rem;
+}
+
+.header-tags {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.tag-crop  { background: #e8f4fd; color: #0066cc; }
+.tag-period { background: #f0faf0; color: #2d862d; }
+.tag-date  { background: #f5f5f5; color: #555; font-weight: 400; }
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  align-items: start;
+}
+
+.card {
+  background: white;
+  padding: 1.25rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.card h2 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: #333;
+}
+
+.chart-card { }
+
+.chart-wrap {
+  height: 240px;
+  position: relative;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stat-card {
+  padding: 1rem;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #222;
+}
+
+.model-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.stat-sub {
+  font-size: 0.8rem;
+  color: #888;
+  margin-top: 0.15rem;
+}
+
+.stat-sub.positive { color: #28a745; }
+.stat-sub.negative { color: #dc3545; }
+
+.table-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.table-top h2 { margin: 0; }
+
+.export-btn {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid #28a745;
+  border-radius: 4px;
+  background: white;
+  color: #28a745;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.export-btn:hover {
+  background: #28a745;
+  color: white;
 }
 
 .data-table {
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid #eee;
+  border-radius: 6px;
   overflow: hidden;
+  font-size: 0.9rem;
 }
 
 .table-header {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
- background-color: #f8f9fa;
-  font-weight: bold;
-  padding: 0.75rem;
-  border-bottom: 1px solid #ddd;
+  grid-template-columns: 2fr 1.5fr 1fr;
+  background: #f8f9fa;
+  font-weight: 600;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid #eee;
+  color: #555;
 }
 
 .table-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  padding: 0.75rem;
-  border-bottom: 1px solid #eee;
+  grid-template-columns: 2fr 1.5fr 1fr;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #f5f5f5;
 }
 
-.table-row:last-child {
-  border-bottom: none;
-}
+.table-row:last-child { border-bottom: none; }
 
-.col-date {
-  font-weight: bold;
-}
+.col-price { color: #007bff; font-weight: 600; }
 
-.col-price {
-  color: #007bff;
-  font-weight: bold;
-}
-
-.col-change.positive {
- color: #28a745;
-}
-
-.col-change.negative {
-  color: #dc3545;
-}
+.positive { color: #28a745; }
+.negative { color: #dc3545; }
 </style>

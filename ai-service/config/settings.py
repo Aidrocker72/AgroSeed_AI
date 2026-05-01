@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # Model settings
     model_storage_path: str = "./models"
     default_forecast_period: int = 30 # days
-    supported_forecast_periods: list[int] = [7, 14, 30]
+    supported_forecast_periods: list[int] = [7, 14, 30, 90]
     
     # External services
     etl_service_url: str = "http://etl-service:8000"

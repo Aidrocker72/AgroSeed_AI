@@ -12,39 +12,37 @@ predictor = PricePredictor(model_storage_path=settings.model_storage_path)
 
 @router.post("/predict", response_model=PredictionOutput)
 async def predict_price(input_data: PredictionInput) -> Dict[str, Any]:
-    """
-    Прогнозирование цен на семена на основе исторических данных и новостей
-    """
+    if input_data.forecast_period not in settings.supported_forecast_periods:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Период {input_data.forecast_period} дней не поддерживается. "
+                   f"Допустимые: {settings.supported_forecast_periods}",
+        )
+
     try:
         start_time = time.time()
-        
-        # Проверяем, поддерживается ли запрашиваемый период
-        if input_data.forecast_period not in settings.supported_forecast_periods:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Прогнозирование на {input_data.forecast_period} дней не поддерживается. "
-                       f"Поддерживаемые периоды: {settings.supported_forecast_periods}"
-            )
-        
-        # Выполняем предсказание
+
+        seed_list = [item.model_dump() for item in input_data.seed_data]
+        news_list = [item.model_dump() for item in input_data.news_data]
+
+        # Всегда переобучаем — каждый запрос может содержать данные другой культуры
+        predictor.train(seed_list, news_list)
+
         result = predictor.predict(
-            seed_data=[item.dict() for item in input_data.seed_data],
-            news_data=[item.dict() for item in input_data.news_data],
-            forecast_period=input_data.forecast_period
+            seed_data=seed_list,
+            news_data=news_list,
+            forecast_period=input_data.forecast_period,
         )
-        
-        execution_time = time.time() - start_time
-        
-        # Возвращаем результат
+
         return {
             "forecast": result["forecast"],
             "confidence_interval": result["confidence_interval"],
             "model_info": result["model_info"],
-            "execution_time": execution_time
+            "execution_time": time.time() - start_time,
         }
-        
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка при выполнении прогноза: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка прогноза: {str(e)}")
 
 
 @router.post("/train")
@@ -57,8 +55,8 @@ async def train_model(input_data: PredictionInput) -> Dict[str, Any]:
         
         # Выполняем обучение
         result = predictor.train(
-            seed_data=[item.dict() for item in input_data.seed_data],
-            news_data=[item.dict() for item in input_data.news_data]
+            seed_data=[item.model_dump() for item in input_data.seed_data],
+            news_data=[item.model_dump() for item in input_data.news_data],
         )
         
         execution_time = time.time() - start_time

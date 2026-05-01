@@ -58,7 +58,7 @@ const handleLogin = async () => {
     await authStore.login(email.value, password.value)
     await router.push('/dashboard')
   } catch (err: any) {
-    error.value = err.message || 'Ошибка входа'
+    error.value = err.data?.detail || err.message || 'Ошибка входа'
   } finally {
     loading.value = false
   }
@@ -71,7 +71,7 @@ const handleLogin = async () => {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background-color: #f5f5;
+  background-color: #f5f5f5;
 }
 
 .login-form {

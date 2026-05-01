@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from config.settings import settings
-from database.connection import engine
+from database.connection import engine, AsyncSessionLocal
 from database import models
 from routers import etl
 from services.scheduler import SchedulerService
+from services.seed import seed_etl_data
 
 
 scheduler_service = SchedulerService()
@@ -14,6 +15,8 @@ scheduler_service = SchedulerService()
 async def lifespan(_: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(models.Base.metadata.create_all)
+    async with AsyncSessionLocal() as db:
+        await seed_etl_data(db)
     await scheduler_service.start()
     yield
     await scheduler_service.stop()
@@ -23,7 +26,6 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.version,
     debug=settings.debug,
-    root_path=settings.api_prefix,
     lifespan=lifespan,
 )
 

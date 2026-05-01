@@ -1,88 +1,49 @@
 import { defineStore } from 'pinia'
 
-export const useAuthStore = defineStore('auth', {
-  state: () => ({
-    user: null as any,
-    token: null as string | null,
-    isAuthenticated: false,
-  }),
+export const useAuthStore = defineStore('auth', () => {
+  const tokenCookie = useCookie<string | null>('auth_token', { maxAge: 60 * 60 * 24 })
+  const token = ref<string | null>(tokenCookie.value ?? null)
+  const user = ref<any>(null)
+  const isAuthenticated = computed(() => !!token.value)
 
-  getters: {
-    isLoggedIn: (state) => !!state.token,
-    currentUser: (state) => state.user,
-  },
-
-  actions: {
-    async login(email: string, password: string) {
-      try {
-        const response = await $fetch('/auth/login', {
-          method: 'POST',
-          body: { email, password }
-        })
-
-        this.token = response.access_token
-        this.isAuthenticated = true
-        
-        // Установка заголовка авторизации для последующих запросов
-        if (process.client) {
-          (window as any).$nuxt.$axios.setHeader('Authorization', `Bearer ${this.token}`)
-        }
-        
-        return response
-      } catch (error) {
-        console.error('Login error:', error)
-        throw error
-      }
-    },
-
-    async register(email: string, password: string, name?: string) {
-      try {
-        const response = await $fetch('/auth/register', {
-          method: 'POST',
-          body: { email, password, name }
-        })
-
-        return response
-      } catch (error) {
-        console.error('Registration error:', error)
-        throw error
-      }
-    },
-
-    async logout() {
-      this.user = null
-      this.token = null
-      this.isAuthenticated = false
-      
-      if (process.client) {
-        (window as any).$nuxt.$axios.setHeader('Authorization', null)
-      }
-    },
-
-    async fetchUser() {
-      if (!this.token) return null
-
-      try {
-        const response = await $fetch('/users/me', {
-          headers: {
-            'Authorization': `Bearer ${this.token}`
-          }
-        })
-
-        this.user = response
-        return response
-      } catch (error) {
-        console.error('Error fetching user:', error)
-        this.logout()
-        throw error
-      }
-    }
-  },
-
-  // Сохранение состояния в localStorage
-  persist: {
-    key: 'auth',
-    storage: localStorage,
-    paths: ['token', 'isAuthenticated']
+  const login = async (email: string, password: string) => {
+    const config = useRuntimeConfig()
+    const response = await $fetch<{ access_token: string }>('/auth/login', {
+      baseURL: config.public.apiBaseUrl,
+      method: 'POST',
+      body: { email, password },
+    })
+    tokenCookie.value = response.access_token
+    token.value = response.access_token
+    return response
   }
+
+  const register = async (email: string, password: string) => {
+    const config = useRuntimeConfig()
+    return await $fetch('/auth/register', {
+      baseURL: config.public.apiBaseUrl,
+      method: 'POST',
+      body: { email, password },
+    })
+  }
+
+  const logout = () => {
+    tokenCookie.value = null
+    token.value = null
+    user.value = null
+    navigateTo('/login')
+  }
+
+  const fetchUser = async () => {
+    if (!token.value) return null
+    try {
+      const api = useApi()
+      user.value = await api('/users/me')
+      return user.value
+    } catch {
+      logout()
+    }
+  }
+
+  return { token, user, isAuthenticated, login, register, logout, fetchUser }
 })

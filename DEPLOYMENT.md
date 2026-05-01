@@ -90,7 +90,7 @@ docker run --name agroseed-postgres \
 ```bash
 # .env
 DEBUG=False
-SECRET_KEY=your-production-secret-key
+SECRET_KEY=d0753797ba0f8d4e716b31f7e80e9bf026fe19e3a5a0ae7210bfab23449a3253your-production-secret-key
 DATABASE_URL=postgresql+asyncpg://user:password@postgres:5432/agroseed
 ETL_SERVICE_URL=http://etl-service:8000
 AI_SERVICE_URL=http://ai-service:8000

@@ -28,15 +28,15 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db_sess
 
 
 @router.post("/login")
-async def login(email: str, password: str, db: AsyncSession = Depends(get_db_session)):
-    user = await auth_service.authenticate_user(db, email, password)
+async def login(credentials: UserCreate, db: AsyncSession = Depends(get_db_session)):
+    user = await auth_service.authenticate_user(db, credentials.email, credentials.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     return jwt_auth.create_token_response(user.id)
 
 
