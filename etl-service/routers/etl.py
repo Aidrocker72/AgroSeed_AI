@@ -4,6 +4,8 @@ from typing import Any, List
 from database.connection import get_db_session
 from repositories.seed_data import SeedDataRepository
 from repositories.news import NewsRepository
+from repositories.etl_run import ETLRunRepository
+from repositories.exchange_rate import ExchangeRateRepository
 from services.scheduler import SchedulerService
 
 
@@ -11,6 +13,8 @@ router = APIRouter()
 scheduler_service = SchedulerService()
 seed_data_repo = SeedDataRepository()
 news_repo = NewsRepository()
+etl_run_repo = ETLRunRepository()
+exchange_rate_repo = ExchangeRateRepository()
 
 
 @router.get("/run/seeds")
@@ -70,12 +74,50 @@ async def get_news_data(
     ]
 
 
+@router.get("/data/exchange-rate", response_model=List[Any])
+async def get_exchange_rates(
+    currency: str = "USD",
+    limit: int = 90,
+    db: AsyncSession = Depends(get_db_session),
+):
+    rates = await exchange_rate_repo.get_recent(db, currency=currency, limit=limit)
+    return [
+        {"date": r.date.date().isoformat(), "rate": float(r.rate)}
+        for r in rates
+    ]
+
+
+@router.get("/history")
+async def get_etl_history(limit: int = 20, db: AsyncSession = Depends(get_db_session)):
+    runs = await etl_run_repo.get_recent(db, limit=limit)
+    return [
+        {
+            "id": r.id,
+            "started_at": r.started_at.isoformat(),
+            "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+            "status": r.status,
+            "seed_data_count": r.seed_data_count,
+            "news_count": r.news_count,
+            "data_source": r.data_source,
+            "error": r.error,
+        }
+        for r in runs
+    ]
+
+
 @router.get("/status")
-async def get_scheduler_status():
+async def get_scheduler_status(db: AsyncSession = Depends(get_db_session)):
+    last_run = await etl_run_repo.get_last(db)
     return {
         "status": "running",
         "jobs": [
             {"id": "collect_seeds", "name": "Collect seed data", "interval": "every 6h"},
             {"id": "collect_news", "name": "Collect news data", "interval": "every 4h"},
         ],
+        "last_run": {
+            "timestamp": last_run.started_at.isoformat(),
+            "status": last_run.status,
+            "data_source": last_run.data_source,
+            "seed_data_count": last_run.seed_data_count,
+        } if last_run else None,
     }

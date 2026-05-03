@@ -387,4 +387,50 @@ const exportCsv = () => {
 
 .positive { color: #28a745; }
 .negative { color: #dc3545; }
+
+@media (max-width: 768px) {
+  .forecast-detail {
+    padding: 1rem;
+  }
+
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .stat-card {
+    flex: 1 1 calc(50% - 0.375rem);
+    min-width: 140px;
+  }
+
+  .forecast-header h1 {
+    font-size: 1.3rem;
+  }
+
+  .table-header,
+  .table-row {
+    grid-template-columns: 1.5fr 1.2fr 1fr;
+    font-size: 0.82rem;
+    padding: 0.45rem 0.6rem;
+  }
+
+  .export-btn {
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar {
+    flex-direction: column;
+  }
+
+  .stat-card {
+    flex: 1 1 100%;
+  }
+}
 </style>

@@ -1,0 +1,107 @@
+# Конфигурация регионов AgroSeed AI
+# price_factor: коэффициент цены относительно мировой
+#   > 1.0 — регион ближе к экспортным портам (юг)
+#   < 1.0 — удалённость от портов повышает себестоимость (Сибирь)
+
+territories:
+
+  # Южный ФО — главный экспортный хаб (Новороссийск)
+  - name: "Краснодарский край"
+    price_factor: 1.05
+    federal_district: "Южный"
+
+  - name: "Ростовская область"
+    price_factor: 1.00
+    federal_district: "Южный"
+
+  - name: "Ставропольский край"
+    price_factor: 0.98
+    federal_district: "Северо-Кавказский"
+
+  - name: "Волгоградская область"
+    price_factor: 0.93
+    federal_district: "Южный"
+
+  - name: "Астраханская область"
+    price_factor: 0.91
+    federal_district: "Южный"
+
+  # Центральное Черноземье
+  - name: "Воронежская область"
+    price_factor: 0.95
+    federal_district: "Центральный"
+
+  - name: "Курская область"
+    price_factor: 0.96
+    federal_district: "Центральный"
+
+  - name: "Белгородская область"
+    price_factor: 0.97
+    federal_district: "Центральный"
+
+  - name: "Тамбовская область"
+    price_factor: 0.94
+    federal_district: "Центральный"
+
+  - name: "Липецкая область"
+    price_factor: 0.95
+    federal_district: "Центральный"
+
+  - name: "Орловская область"
+    price_factor: 0.94
+    federal_district: "Центральный"
+
+  # Приволжский ФО
+  - name: "Саратовская область"
+    price_factor: 0.92
+    federal_district: "Приволжский"
+
+  - name: "Самарская область"
+    price_factor: 0.93
+    federal_district: "Приволжский"
+
+  - name: "Оренбургская область"
+    price_factor: 0.90
+    federal_district: "Приволжский"
+
+  - name: "Республика Татарстан"
+    price_factor: 0.93
+    federal_district: "Приволжский"
+
+  - name: "Республика Башкортостан"
+    price_factor: 0.91
+    federal_district: "Приволжский"
+
+  - name: "Пензенская область"
+    price_factor: 0.93
+    federal_district: "Приволжский"
+
+  - name: "Ульяновская область"
+    price_factor: 0.92
+    federal_district: "Приволжский"
+
+  # Уральский ФО
+  - name: "Челябинская область"
+    price_factor: 0.89
+    federal_district: "Уральский"
+
+  - name: "Курганская область"
+    price_factor: 0.88
+    federal_district: "Уральский"
+
+  # Сибирский ФО
+  - name: "Алтайский край"
+    price_factor: 0.88
+    federal_district: "Сибирский"
+
+  - name: "Омская область"
+    price_factor: 0.87
+    federal_district: "Сибирский"
+
+  - name: "Новосибирская область"
+    price_factor: 0.86
+    federal_district: "Сибирский"
+
+  - name: "Красноярский край"
+    price_factor: 0.84
+    federal_district: "Сибирский"

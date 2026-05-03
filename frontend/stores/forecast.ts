@@ -78,6 +78,12 @@ export const useForecastStore = defineStore('forecast', () => {
     return await api(`/forecast/run?${params}`, { method: 'POST' })
   }
 
+  const deleteForecast = async (id: number) => {
+    const api = useApi()
+    await api(`/forecast/${id}`, { method: 'DELETE' })
+    forecasts.value = forecasts.value.filter((f: any) => f.id !== id)
+  }
+
   return {
     forecasts,
     currentForecast,
@@ -89,5 +95,6 @@ export const useForecastStore = defineStore('forecast', () => {
     fetchForecastById,
     createForecast,
     runForecastForCrop,
+    deleteForecast,
   }
 })

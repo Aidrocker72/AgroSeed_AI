@@ -15,10 +15,17 @@ class NewsInput(BaseModel):
     date: date
 
 
+class ExchangeRateInput(BaseModel):
+    date: date
+    rate: float
+
+
 class PredictionInput(BaseModel):
     seed_data: List[SeedDataInput]
     news_data: List[NewsInput]
-    forecast_period: int = 30 # in days
+    forecast_period: int = 30
+    exchange_rates: Optional[List[ExchangeRateInput]] = None
+    oil_prices: Optional[List[ExchangeRateInput]] = None
 
 
 class PredictionOutput(BaseModel):

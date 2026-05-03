@@ -2,16 +2,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config.settings import settings
-from database.connection import engine, AsyncSessionLocal
-from database import models
+from database.connection import AsyncSessionLocal
 from routers import auth, territories, forecast
 from services.seed import seed_territories
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(models.Base.metadata.create_all)
     async with AsyncSessionLocal() as db:
         await seed_territories(db)
     yield

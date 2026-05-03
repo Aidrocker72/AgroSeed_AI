@@ -67,13 +67,43 @@ class ForecastService:
             response.raise_for_status()
             return response.json()
 
+    async def _fetch_rate_data(self, currency: str, limit: int = 90) -> List[Dict[str, Any]]:
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{settings.etl_service_url}/etl/data/exchange-rate",
+                    params={"currency": currency, "limit": limit},
+                    timeout=10.0,
+                )
+                response.raise_for_status()
+                return response.json()
+        except Exception:
+            return []
+
+    async def get_exchange_rates(self) -> List[Dict[str, Any]]:
+        return await self._fetch_rate_data("USD")
+
+    async def get_oil_prices(self) -> List[Dict[str, Any]]:
+        return await self._fetch_rate_data("OIL_USD")
+
     async def run_ai_prediction(
-        self, seed_data: List[Dict[str, Any]], news_data: List[Dict[str, Any]], forecast_period: int = 30
+        self,
+        seed_data: List[Dict[str, Any]],
+        news_data: List[Dict[str, Any]],
+        forecast_period: int = 30,
+        exchange_rates: Optional[List[Dict[str, Any]]] = None,
+        oil_prices: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{settings.ai_service_url}/predict/predict",
-                json={"seed_data": seed_data, "news_data": news_data, "forecast_period": forecast_period},
+                json={
+                    "seed_data": seed_data,
+                    "news_data": news_data,
+                    "forecast_period": forecast_period,
+                    "exchange_rates": exchange_rates or [],
+                    "oil_prices": oil_prices or [],
+                },
                 timeout=120.0,
             )
             response.raise_for_status()

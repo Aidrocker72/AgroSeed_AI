@@ -61,9 +61,14 @@
               </div>
               <p class="forecast-date">{{ formatDate(forecast.created_at) }}</p>
             </div>
-            <NuxtLink :to="`/forecast/${forecast.id}`" class="btn btn-secondary">
-              Открыть
-            </NuxtLink>
+            <div class="forecast-actions">
+              <NuxtLink :to="`/forecast/${forecast.id}`" class="btn btn-secondary">
+                Открыть
+              </NuxtLink>
+              <button class="btn btn-danger" @click="handleDelete(forecast.id)">
+                Удалить
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -108,6 +113,15 @@ const createForecast = async () => {
     await navigateTo(`/forecast/${forecast.id}`)
   } catch (error) {
     console.error('Error creating forecast:', error)
+  }
+}
+
+const handleDelete = async (id: number) => {
+  if (!confirm('Удалить прогноз?')) return
+  try {
+    await forecastStore.deleteForecast(id)
+  } catch (e) {
+    console.error('Error deleting forecast:', e)
   }
 }
 
@@ -210,6 +224,23 @@ select {
   white-space: nowrap;
 }
 
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+  white-space: nowrap;
+}
+
+.btn-danger:hover {
+  background-color: #b02a37;
+}
+
+.forecast-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .btn:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
@@ -278,5 +309,33 @@ select {
   border-radius: 4px;
   color: #856404;
   font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 1rem;
+  }
+
+  .dashboard-content {
+    grid-template-columns: 1fr;
+  }
+
+  .period-buttons {
+    flex-wrap: wrap;
+  }
+
+  .period-btn {
+    flex: 1 1 calc(50% - 0.25rem);
+  }
+
+  .forecast-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .forecast-actions {
+    align-self: flex-end;
+  }
 }
 </style>

@@ -27,9 +27,16 @@ async def run_forecast(
             detail=f"Нет данных по культуре '{crop_name}' для территории {territory_id}.",
         )
 
-    news_data = await forecast_service.get_news_data(territory_id)
+    news_data      = await forecast_service.get_news_data(territory_id)
+    exchange_rates = await forecast_service.get_exchange_rates()
+    oil_prices     = await forecast_service.get_oil_prices()
 
-    ai_result = await forecast_service.run_ai_prediction(seed_data, news_data, forecast_period=forecast_period)
+    ai_result = await forecast_service.run_ai_prediction(
+        seed_data, news_data,
+        forecast_period=forecast_period,
+        exchange_rates=exchange_rates,
+        oil_prices=oil_prices,
+    )
 
     forecast_data = ForecastCreate(
         user_id=current_user.id,
@@ -43,6 +50,18 @@ async def run_forecast(
         ai_result=ai_result,
     )
     return await forecast_service.create_forecast(db, forecast_data)
+
+
+@router.delete("/{forecast_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_forecast(
+    forecast_id: int,
+    current_user: User = Depends(jwt_auth.get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+):
+    forecast = await forecast_service.get_forecast(db, forecast_id)
+    if not forecast or forecast.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Forecast not found")
+    await forecast_service.delete_forecast(db, forecast_id)
 
 
 @router.get("/list", response_model=list[ForecastResponse])

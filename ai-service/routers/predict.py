@@ -22,16 +22,20 @@ async def predict_price(input_data: PredictionInput) -> Dict[str, Any]:
     try:
         start_time = time.time()
 
-        seed_list = [item.model_dump() for item in input_data.seed_data]
-        news_list = [item.model_dump() for item in input_data.news_data]
+        seed_list  = [item.model_dump() for item in input_data.seed_data]
+        news_list  = [item.model_dump() for item in input_data.news_data]
+        rates_list = [item.model_dump() for item in input_data.exchange_rates] if input_data.exchange_rates else None
+        oil_list   = [item.model_dump() for item in input_data.oil_prices] if input_data.oil_prices else None
 
         # Всегда переобучаем — каждый запрос может содержать данные другой культуры
-        predictor.train(seed_list, news_list)
+        predictor.train(seed_list, news_list, exchange_rates=rates_list, oil_prices=oil_list)
 
         result = predictor.predict(
             seed_data=seed_list,
             news_data=news_list,
             forecast_period=input_data.forecast_period,
+            exchange_rates=rates_list,
+            oil_prices=oil_list,
         )
 
         return {

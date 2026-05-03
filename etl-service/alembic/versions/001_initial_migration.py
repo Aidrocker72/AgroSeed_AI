@@ -1,15 +1,12 @@
 """Initial migration
 
 Revision ID: 001_initial_migration
-Revises: 
+Revises:
 Create Date: 2025-11-30 17:00:00.000000
 
 """
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
-# revision identifiers, used by Alembic.
 revision = '001_initial_migration'
 down_revision = None
 branch_labels = None
@@ -17,42 +14,38 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create territories table
-    op.create_table('territories',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(), nullable=False),
-        sa.PrimaryKeyConstraint('id')
-    )
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS territories (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR NOT NULL
+        )
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_territories_id ON territories (id)")
 
-    # Create seed_data table
-    op.create_table('seed_data',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('territory_id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(), nullable=False),
-        sa.Column('price', sa.Numeric(12, 2), nullable=False),
-        sa.Column('date', sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(['territory_id'], ['territories.id'], ),
-        sa.PrimaryKeyConstraint('id')
-    )
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS seed_data (
+            id SERIAL PRIMARY KEY,
+            territory_id INTEGER NOT NULL REFERENCES territories(id),
+            name VARCHAR NOT NULL,
+            price NUMERIC(12, 2) NOT NULL,
+            date TIMESTAMPTZ NOT NULL
+        )
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_seed_data_id ON seed_data (id)")
 
-    # Create news table
-    op.create_table('news',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('territory_id', sa.Integer(), nullable=False),
-        sa.Column('title', sa.String(), nullable=False),
-        sa.Column('content', sa.Text(), nullable=False),
-        sa.Column('date', sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(['territory_id'], ['territories.id'], ),
-        sa.PrimaryKeyConstraint('id')
-    )
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS news (
+            id SERIAL PRIMARY KEY,
+            territory_id INTEGER NOT NULL REFERENCES territories(id),
+            title VARCHAR NOT NULL,
+            content TEXT NOT NULL,
+            date TIMESTAMPTZ NOT NULL
+        )
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_news_id ON news (id)")
 
 
 def downgrade() -> None:
-    # Drop news table
-    op.drop_table('news')
-    
-    # Drop seed_data table
-    op.drop_table('seed_data')
-    
-    # Drop territories table
-    op.drop_table('territories')
+    op.execute("DROP TABLE IF EXISTS news")
+    op.execute("DROP TABLE IF EXISTS seed_data")
+    op.execute("DROP TABLE IF EXISTS territories")

@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     # External data sources
     seeds_api_url: Optional[str] = None
     news_rss_url: str = "https://rss.example.com/news"
+    world_bank_api_url: str = "https://api.worldbank.org/v2"
+    usd_to_rub_rate: float = 90.0
     
     # Application settings
     app_name: str = "AgroSeed AI ETL Service"
